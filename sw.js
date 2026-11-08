@@ -1,6 +1,6 @@
 // Guarda o app no iPhone para funcionar mesmo sem internet.
 // Ao mudar qualquer arquivo, aumente o número da versão abaixo.
-var CACHE = "estudo-biblico-v1";
+var CACHE = "estudo-biblico-v2";
 var FILES = [
   "./",
   "index.html",
@@ -27,10 +27,12 @@ self.addEventListener("activate", function (e) {
 });
 
 // Tenta a internet primeiro (para pegar histórias novas); sem internet, usa a cópia guardada.
+// "no-cache" faz o iPhone sempre perguntar ao GitHub se há versão nova,
+// em vez de usar a cópia de até 10 minutos que o navegador guarda.
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then(function (res) {
+    fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" }).then(function (res) {
       var copy = res.clone();
       caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
       return res;
