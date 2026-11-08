@@ -90,6 +90,14 @@
     return s.parte ? s.titulo + " (" + s.parte.split(" · ")[0] + ")" : s.titulo;
   }
 
+  // Link do Claude: um chat ou projeto fixo que você escolhe nos Ajustes.
+  function claudeLink() {
+    return state.claudeLink || "https://claude.ai/new";
+  }
+  function validClaudeLink(t) {
+    return /^https:\/\/claude\.ai\/\S+$/.test(t);
+  }
+
   function quizPrompt(s) {
     return [
       "Acabei de ler " + fullTitle(s) + ", em " + s.referencia + ", na Bíblia NVI. Quero testar o que entendi.",
@@ -198,7 +206,8 @@
 
     html += '<section class="card"><div class="label" style="margin-bottom:10px">Depois da leitura</div>' +
       '<button class="btn quiet" data-act="quiz">Copiar prompt do quiz</button>' +
-      '<a class="btn quiet" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir o Claude</a>' +
+      '<a class="btn quiet" href="' + esc(claudeLink()) + '" target="_blank" rel="noopener">' +
+      (state.claudeLink ? "Abrir meu chat do Claude" : "Abrir o Claude") + '</a>' +
       '<p class="note" style="text-align:center">Copie, abra o Claude e cole na conversa. São ' + s.perguntas + ' perguntas de múltipla escolha.</p></section>';
 
     if (lr) html += '<button class="link-btn" data-act="undo">Desmarcar a última leitura</button>';
@@ -220,6 +229,14 @@
       '<button class="btn quiet" data-act="import">Restaurar backup</button>' +
       '<input type="file" id="file" accept="application/json,.json">' +
       '<p class="note">Restaurar junta o backup com o que já está no app — nada é apagado.</p></section>';
+    html += '<section class="card settings"><h2 style="font-size:20px;margin-bottom:8px">Chat do Claude</h2>' +
+      '<p>Para o botão “Abrir o Claude” levar sempre ao mesmo chat, abra esse chat no Claude, copie o link dele e cole aqui.</p>' +
+      '<input type="url" id="claude-link" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+      'placeholder="https://claude.ai/chat/..." value="' + esc(state.claudeLink || "") + '">' +
+      '<p class="field-error" id="claude-error" hidden>Cole um link que comece com https://claude.ai/</p>' +
+      '<button class="btn" data-act="save-link">Salvar link</button>' +
+      (state.claudeLink ? '<button class="btn quiet" data-act="clear-link">Voltar a abrir um chat novo</button>' : "") +
+      '<p class="note">' + (state.claudeLink ? "Hoje o botão abre o seu chat salvo." : "Hoje o botão abre um chat novo a cada vez.") + '</p></section>';
     app.innerHTML = html;
   }
 
@@ -262,6 +279,7 @@
 
   function exportBackup() {
     var data = { app: "estudo-biblico", versao: 1, exportadoEm: new Date().toISOString(), reads: state.reads };
+    if (state.claudeLink) data.claudeLink = state.claudeLink;
     var name = "estudo-biblico-backup-" + todayKey() + ".json";
     var text = JSON.stringify(data, null, 2);
     var done = function () { state.ultimoBackup = todayKey(); save(); renderSettings(); };
@@ -296,6 +314,9 @@
           added += merged.length - (state.reads[id] || []).length;
           if (merged.length) state.reads[id] = merged;
         });
+        if (!state.claudeLink && typeof data.claudeLink === "string" && validClaudeLink(data.claudeLink)) {
+          state.claudeLink = data.claudeLink;
+        }
         save();
         renderSettings();
         toast(added ? "Backup restaurado." : "Backup lido — já estava tudo aqui.");
@@ -321,6 +342,17 @@
     }
     else if (act === "export") exportBackup();
     else if (act === "import") document.getElementById("file").click();
+    else if (act === "save-link") {
+      var val = document.getElementById("claude-link").value.trim();
+      if (!validClaudeLink(val)) { document.getElementById("claude-error").hidden = false; return; }
+      state.claudeLink = val; save(); renderSettings(); toast("Link salvo.");
+    }
+    else if (act === "clear-link") {
+      delete state.claudeLink; save(); renderSettings(); toast("O botão volta a abrir um chat novo.");
+    }
+  });
+  app.addEventListener("input", function (e) {
+    if (e.target.id === "claude-link") document.getElementById("claude-error").hidden = true;
   });
   app.addEventListener("change", function (e) {
     if (e.target.id === "file" && e.target.files[0]) importBackup(e.target.files[0]);
